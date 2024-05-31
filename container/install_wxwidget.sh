@@ -8,3 +8,4 @@ tar xvf wxWidgets-${WX_VERSION}.tar.bz2
 cd wxWidgets-${WX_VERSION}
 ./configure --disable-shared --enable-unicode
 make install
+rm wxWidgets-${WX_VERSION}.tar.bz2
