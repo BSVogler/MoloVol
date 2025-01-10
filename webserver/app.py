@@ -5,8 +5,8 @@ import shutil
 from typing import Optional
 from uuid import uuid4
 from enum import Enum
-
-from flask import Flask, request, jsonify, render_template, Response, send_from_directory, url_for
+import time
+from flask import Flask, request, jsonify, render_template, Response, send_from_directory
 from flask_cors import CORS
 import subprocess
 
@@ -38,12 +38,15 @@ cors = CORS(app, resources={r"/api/*": {"origins": "http://localhost:4000"}})
 
 # This prefix allows the renderer to tell that the line is an error
 ERR_PREFIX = "E."
+
+
 class ErrMsg(str, Enum):
-    NOFILE =    ERR_PREFIX + "No file was uploaded and previous file could not be used",
-    NORADIUS =  ERR_PREFIX + "Small probe radius must be specied",
-    NOGRID =    ERR_PREFIX + "Spatial resolution must be specified",
+    NOFILE = ERR_PREFIX + "No file was uploaded and previous file could not be used",
+    NORADIUS = ERR_PREFIX + "Small probe radius must be specied",
+    NOGRID = ERR_PREFIX + "Spatial resolution must be specified",
     SMALLGRID = ERR_PREFIX + "If you would like to use a spatial resolution of less than 0.1, please use the desktop application",
-    FORMAT =    ERR_PREFIX + "File format of uploaded file is not supported"
+    FORMAT = ERR_PREFIX + "File format of uploaded file is not supported"
+
 
 # Redirects for favicons
 
@@ -122,7 +125,7 @@ def mstile70():
 @app.template_filter('basename')
 def basename(path):
     if path:
-        return os.path.basename(path).split('_',1)[-1]
+        return os.path.basename(path).split('_', 1)[-1]
     else:
         return ""
 
@@ -139,8 +142,8 @@ def titleline(output):
 
 @app.template_filter('tablesplit')
 def tablesplit(tablerow):
-    n=20;
-    return [tablerow[i:i+n] for i in range(0, len(tablerow), n)]
+    n = 20
+    return [tablerow[i:i + n] for i in range(0, len(tablerow), n)]
 
 
 @app.template_filter('errorstrip')
@@ -153,7 +156,7 @@ ALLOWED_EXTENSIONS = {'xyz', 'pdb', 'cif'}
 
 def validate_extension(filename):
     return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def manage_uploaded_file(request, filetype="structure"):
@@ -184,10 +187,10 @@ def manage_uploaded_file(request, filetype="structure"):
         else:
             out += ErrMsg.FORMAT + "\n"
             path = None
-    
+
     if out:
         print(out)
-    
+
     return path
 
 
@@ -234,8 +237,8 @@ def save_log(log) -> str:
 def io():
     global out
     out = None
-    resultslink = None
-    inputdict = {}
+    results_link = None
+    input_dict = {}
     export = None
     tmp_outdir = None
     structure_path = None
@@ -243,19 +246,18 @@ def io():
     v_out = app_version()
 
     if request.method == 'POST':
-
-        reduce_dir_to_target_size(export_dir, 
-                                  3 * 1024 * 1024 * 1024, 
-                                  4 * 1024 * 1024 * 1024, 
-                                  600); # 3 GiB kept 10 mins, max 4 GiB
-        reduce_dir_to_target_size(UPLOAD_FOLDER, 
-                                  0.8 * 1024 * 1024 * 1024, 
-                                  1.0 * 1024 * 1024 * 1024, 
-                                  1800); # 0.8 GiB kept 30 mins, max 1 GiB
-        reduce_dir_to_target_size(log_dir, 
-                                  10 * 1024 * 1024, 
-                                  100 * 1024 * 1024, 
-                                  3600); # 10 MiB kept 60 mins, max 100 MiB
+        reduce_dir_to_target_size(export_dir,
+                                  3 * 1024 * 1024 * 1024,
+                                  4 * 1024 * 1024 * 1024,
+                                  600)  # 3 GiB kept 10 mins, max 4 GiB
+        reduce_dir_to_target_size(UPLOAD_FOLDER,
+                                  0.8 * 1024 * 1024 * 1024,
+                                  1.0 * 1024 * 1024 * 1024,
+                                  1800)  # 0.8 GiB kept 30 mins, max 1 GiB
+        reduce_dir_to_target_size(log_dir,
+                                  10 * 1024 * 1024,
+                                  100 * 1024 * 1024,
+                                  3600)  # 10 MiB kept 60 mins, max 100 MiB
 
         out = ""
         # when arguments ignore form data
@@ -286,9 +288,8 @@ def io():
                         out += ErrMsg.SMALLGRID + "\n"
                         continue
 
-
                 args.append(f"--{key}")
-                    
+
                 # Handle checkboxes
                 if value == "on":
                     # when export is requested add -do option
@@ -308,7 +309,7 @@ def io():
                     # args will be passed to the command line!
                     args.append(str(value))
 
-            inputdict = request.form
+            input_dict = request.form
 
             # read structure file
             if structure_path := manage_uploaded_file(request, filetype="structure"):
@@ -318,40 +319,39 @@ def io():
             # read elements file
             elements_path = "/usr/share/molovol/elements.txt"
             args.append("-fe")
-            args.append(elements_path) # May not even be necessary
+            args.append(elements_path)  # May not even be necessary
 
             # we only print it out in the end, so we can put it to quiet
             args.append("-q")
-            args.append("-o") 
+            args.append("-o")
             args.append("resolution,depth,radius_small,radius_large,options,vol,surf,cavities")
 
         else:
             args = request.args.get('cli-arguments', '').split(" ")
-            inputdict = request.args
+            input_dict = request.args
 
         # These three options are required
         if "--radius" in args and "--grid" in args and structure_path:
             print(f"Starting process with args: {args}\n")
-            
+
             try:
                 mlvl_out = subprocess.check_output(["./launch_headless.sh"] + args, stderr=subprocess.STDOUT).decode(
                     "utf-8")
+                # If an error occurred, extract the error message from the output
+                if mlvl_out.startswith("Usage"):
+                    mlvl_out = ERR_PREFIX + mlvl_out.split("\n")[-2] + "\n"
+                else:
+                    mlvl_out = f"Results for structure file: {basename(structure_path)}\n" + mlvl_out
+
+                out += mlvl_out
+                print(out)
             except Exception as e:
                 out = "Exception: " + str(e)
 
-            # If an error occured, extract the error message from the output
-            if mlvl_out.startswith("Usage"):
-                mlvl_out = ERR_PREFIX + mlvl_out.split("\n")[-2] + "\n"
-            else:
-                mlvl_out = f"Results for structure file: {basename(structure_path)}\n" + mlvl_out 
-
-            out += mlvl_out
-            print(out)
-
             if export:
-                resultslink = f"/{tmp_outdir}"
+                results_link = f"/{tmp_outdir}"
             else:
-                resultslink = f"/{save_log(out)}"
+                results_link = f"/{save_log(out)}"
 
     if request.accept_mimetypes['text/html']:
 
@@ -362,13 +362,13 @@ def io():
         if structure_path:
             print(structure_path)
 
-        return render_template('form.html', inputdict=inputdict, returnvalues=out,
-                               resultslink=resultslink, version=v_out, laststructure=structure_path)
+        return render_template('form.html', inputdict=input_dict, returnvalues=out,
+                               resultslink=results_link, version=v_out, laststructure=structure_path)
 
     elif request.accept_mimetypes['application/json']:
         return jsonify({"output": out})
 
-import time
+
 # Makes space for new user upload and export files by deleting the oldest files until a predefined
 # amount of disk space is available. Keeps all files that are younger than the grace period. The
 # grace period is given in seconds.
@@ -377,16 +377,16 @@ def reduce_dir_to_target_size(directory, target_size, max_size, grace_period=0):
     total_size = get_entry_size(directory)
 
     entries = os.listdir(directory)
-    entries = [os.path.join(directory,x) for x in entries]
+    entries = [os.path.join(directory, x) for x in entries]
     entries.sort(key=os.path.getctime, reverse=True)  # Sort files and folders by creation time (oldest first)
 
     current_time = time.time()
-    latest_ctime = current_time - grace_period # Determine the latest allowed creation time
+    latest_ctime = current_time - grace_period  # Determine the latest allowed creation time
 
     while entries and total_size > target_size:
         entry_path = entries.pop()
         entry_size = get_entry_size(entry_path)
-        
+
         # Skip file if it is too young and there is still space in the directory
         entry_ctime = os.path.getctime(entry_path)
         if entry_ctime > latest_ctime and total_size < max_size:
@@ -396,9 +396,9 @@ def reduce_dir_to_target_size(directory, target_size, max_size, grace_period=0):
 
         try:
             if os.path.isfile(entry_path):
-                os.remove(entry_path) # Delete the file
+                os.remove(entry_path)  # Delete the file
             else:
-                shutil.rmtree(entry_path) # Delete the folder
+                shutil.rmtree(entry_path)  # Delete the folder
             print(f"Deleted: {entry_path}")
             total_size -= entry_size
         except OSError as e:
@@ -406,10 +406,11 @@ def reduce_dir_to_target_size(directory, target_size, max_size, grace_period=0):
 
     print(f"Total directory size is now {total_size} bytes.\n")
 
+
 # Determines the size of an entry, i.e., a directory or a file
 def get_entry_size(entry_path):
     total_size = 0
-        
+
     if os.path.isfile(entry_path):
         total_size = os.path.getsize(entry_path)
     else:
@@ -419,6 +420,7 @@ def get_entry_size(entry_path):
                 total_size += os.path.getsize(file_path)
 
     return total_size
+
 
 # Request the executable's version. If the executable is not found, then the web page crashes
 def app_version():
@@ -434,9 +436,8 @@ def is_nonzero_numeric(value):
     return True
 
 
-def is_str_smaller_than(text, lowerlim):
+def is_str_smaller_than(text, lower_lim):
     try:
-        return float(text) < lowerlim
+        return float(text) < lower_lim
     except ValueError:
         return True
-
