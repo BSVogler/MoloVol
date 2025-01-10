@@ -22,7 +22,7 @@ WORKDIR /
 
 # add flask webserver
 #RUN apt install software-properties-common -y
-RUN apt install python3.11 curl -y && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt install python3.12 curl -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 # install poetry
 RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=/usr/local/ python3 - --version 1.6.1
 RUN poetry config virtualenvs.create false
