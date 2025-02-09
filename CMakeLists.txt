@@ -35,6 +35,10 @@ set(wxWidgets_USE_STATIC=ON)
 find_package(wxWidgets REQUIRED core base OPTIONAL_COMPONENTS net)
 include(${wxWidgets_USE_FILE})
 
+# Add the benchmark library
+find_package(benchmark REQUIRED)
+include_directories(${BENCHMARK_INCLUDE_DIRS})
+
 #find_package(OpenMP)
 
 # Add include path, so that header files can be found
@@ -81,11 +85,6 @@ target_link_libraries(${EXE_NAME} ${wxWidgets_LIBRARIES})
 if(MOLOVOL_ABS_RESOURCE_PATH)
   target_compile_definitions(${EXE_NAME} PUBLIC -DABS_PATH)
 endif()
-
-# Keeping this around just so I don't forget the syntax
-#  if(OpenMP_CXX_FOUND)
-#    target_link_libraries(target PUBLIC OpenMP::OpenMP_CXX)
-#  endif()
 
 # Tests
 if (MOLOVOL_BUILD_TESTING AND BUILD_TESTING)
