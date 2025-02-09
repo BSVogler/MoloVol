@@ -11,7 +11,6 @@ include(Options)
 project(MoloVol VERSION 1.1.1)
 
 # Strip binary for release build
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 
 # Minimum macOS version, ignored on other platforms
@@ -90,6 +89,8 @@ endif()
 # Tests
 if (MOLOVOL_BUILD_TESTING AND BUILD_TESTING)
   include(Testing)
+  enable_testing()
+  add_subdirectory(test)
 endif()
 
 # Installation instructions for debian package
@@ -100,4 +101,3 @@ elseif (APPLE)
 endif()
 
 include(Packing)
-
