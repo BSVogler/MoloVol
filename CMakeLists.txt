@@ -12,6 +12,7 @@ project(MoloVol VERSION 1.1.1)
 
 # Strip binary for release build
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
 
 # Minimum macOS version, ignored on other platforms
 # Must be set before project()
