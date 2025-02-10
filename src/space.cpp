@@ -128,28 +128,51 @@ void Space::assignTypeInGrid(std::vector<Atom>& atomlist, std::vector<Cavity>& c
   assignShellVsVoid();
 }
 
-void Space::assignAtomVsCore(){
-  if (Ctrl::getInstance()->getAbortFlag()){return;}
-  // calculate position of first voxel
-  const std::array<double,3> vxl_origin = getOrigin();
-  // calculate side length of top level voxel
-  const double vxl_dist = _grid_size * pow(2,_max_depth);
-  std::array<double,3> vxl_pos;
-  std::array<unsigned,3> top_lvl_index;
-  for(top_lvl_index[0] = 0; top_lvl_index[0] < getGridsteps()[0]; top_lvl_index[0]++){
-    Ctrl::getInstance()->updateCalculationStatus();
-    vxl_pos[0] = vxl_origin[0] + vxl_dist * (0.5 + top_lvl_index[0]);
-    for(top_lvl_index[1] = 0; top_lvl_index[1] < getGridsteps()[1]; top_lvl_index[1]++){
-      vxl_pos[1] = vxl_origin[1] + vxl_dist * (0.5 + top_lvl_index[1]);
-      for(top_lvl_index[2] = 0; top_lvl_index[2] < getGridsteps()[2]; top_lvl_index[2]++){
-        vxl_pos[2] = vxl_origin[2] + vxl_dist * (0.5 + top_lvl_index[2]);
-        // voxel position is deliberately not stored in voxel object to reduce memory cost
-        if (Ctrl::getInstance()->getAbortFlag()){return;}
-        getTopVxl(top_lvl_index).evalRelationToAtoms(top_lvl_index, vxl_pos, _max_depth);
-      }
+void Space::assignAtomVsCore() {
+    auto* ctrl = Ctrl::getInstance();
+    if (ctrl->getAbortFlag()) return;
+
+    // Pre-calculate constants
+    const auto& gridsteps = getGridsteps();
+    const auto vxl_origin = getOrigin();
+    const double vxl_dist = _grid_size * std::pow(2, _max_depth);
+    const int max_x = gridsteps[0];
+    const int max_y = gridsteps[1];
+    const int max_z = gridsteps[2];
+
+    // Pre-allocate position array
+    std::array<double, 3> vxl_pos;
+    std::array<unsigned, 3> top_lvl_index{0, 0, 0};
+
+    // Calculate base offsets
+    const double half_vxl_dist = 0.5 * vxl_dist;
+    const double base_x = vxl_origin[0] + half_vxl_dist;
+    const double base_y = vxl_origin[1] + half_vxl_dist;
+    const double base_z = vxl_origin[2] + half_vxl_dist;
+
+    #pragma omp parallel for collapse(2) schedule(dynamic) firstprivate(vxl_pos, top_lvl_index)
+    for(int i = 0; i < max_x; ++i) {
+        for(int j = 0; j < max_y; ++j) {
+            if (ctrl->getAbortFlag()) continue;
+            
+            vxl_pos[0] = base_x + i * vxl_dist;
+            vxl_pos[1] = base_y + j * vxl_dist;
+            top_lvl_index[0] = i;
+            top_lvl_index[1] = j;
+
+            for(int k = 0; k < max_z; ++k) {
+                vxl_pos[2] = base_z + k * vxl_dist;
+                top_lvl_index[2] = k;
+
+                getTopVxl(top_lvl_index).evalRelationToAtoms(top_lvl_index, vxl_pos, _max_depth);
+            }
+            
+            if ((i * max_y + j) % 32 == 0) {
+                ctrl->updateCalculationStatus();
+            }
+        }
     }
-    Ctrl::getInstance()->updateProgressBar(int(100*(double(top_lvl_index[0])+1)/double(getGridsteps()[0])));
-  }
+    	Ctrl::getInstance()->updateProgressBar(int(100*(double(top_lvl_index[0])+1)/double(getGridsteps()[0])));
 }
 
 void Space::identifyCavities(std::vector<Cavity>& cavities, const bool cavity_types){
