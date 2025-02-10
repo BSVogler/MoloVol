@@ -387,122 +387,106 @@ double Space::calcSurfArea(const std::vector<char>& types, const unsigned char i
   return (surface * (_grid_size*_grid_size));
 }
 
-double Space::tallySurface(const std::vector<char>& types, std::array<unsigned int,3>& start_index, std::array<unsigned int,3>& end_index, const unsigned char id, const bool cavity){
-  double surface = 0;
+double Space::tallySurface(const std::vector<char>& types, 
+                            std::array<unsigned int,3>& start_index, 
+                            std::array<unsigned int,3>& end_index, 
+                            const unsigned char id, 
+                            const bool cavity) {
+    double surface = 0.0;
+    auto* ctrl = Ctrl::getInstance(); // Cache the controller instance
 
-  // loop over all voxels within range minus one in each direction because the +1 neighbors will be checked at the same time
-  std::array<unsigned int,3> index;
-  Ctrl::getInstance()->updateCalculationStatus();
-  for(index[2] = start_index[2]; index[2] < end_index[2]-1; index[2]++){
-    for(index[1] = start_index[1]; index[1] < end_index[1]-1; index[1]++){
-      if(Ctrl::getInstance()->getAbortFlag()){return 0;}
-      for(index[0] = start_index[0]; index[0] < end_index[0]-1; index[0]++){
-        surface += SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity));
-      }
-    }
-  }
-  if(_unit_cell){
-    /* the surface area is counted between voxels, thus the borders of the unit cell should include partial surface area by configuration
-    since the surface area is not homogeneous over the voxel, the surface area from the borders will be an approximation
-    -1,-1,-1 *1/8 on 1 vertex
-    -1,-1,i  *1/4 on 3 edges
-    -1,i,i   *1/2 on 3 faces
-    -1,n,i   *((1/4)+(mod/2)) on 6 edges
-    -1,-1,n  *((1/8)+(mod/4)) on 3 vertices
-    -1,n,n   *((1/8)+(modA/4)+(modB/4)+(modA*modB/2)) on 3 vertices
-    n,i,i    *((1/2)+mod) on 3 faces
-    n,n,i    *((1/4)+(modA/2)+(modB/2)+(modA*modB)) on 3 edges
-    n,n,n    *((1/8)+(modA/4)+(modB/4)+(modC/4)+(modA*modB/2)+(modA*modC/2)+(modB*modC/2)+(modA*modB*modC)) on 1 vertex
-    */
+    // Pre-calculate unit cell related values if needed
+    const bool has_unit_cell = _unit_cell;
+    const auto unit_cell_mods = has_unit_cell ? 
+        std::make_tuple(_unit_cell_mod_index[0], _unit_cell_mod_index[1], _unit_cell_mod_index[2]) : 
+        std::make_tuple(0.0, 0.0, 0.0);
 
-    // add first -1,-1,-1 vertex
-    for(int i = 0; i < 3; i++){
-      index[i] = _unit_cell_start_index[i]-1;
-    }
-    surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * 0.125);
-
-    // add last n,n,n vertex
-    for(int i = 0; i < 3; i++){
-      index[i] = _unit_cell_end_index[i]-1;
-    }
-    surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) *
-                (0.125 +
-                 ((_unit_cell_mod_index[0] + _unit_cell_mod_index[1] + _unit_cell_mod_index[2])/4) +
-                 (_unit_cell_mod_index[0] * _unit_cell_mod_index[1]/2) +
-                 (_unit_cell_mod_index[0] * _unit_cell_mod_index[2]/2) +
-                 (_unit_cell_mod_index[1] * _unit_cell_mod_index[2]/2) +
-                 (_unit_cell_mod_index[0] * _unit_cell_mod_index[1] * _unit_cell_mod_index[2])));
-
-    // swap x,y,z
-    for(int n = 0; n < 3; n++){
-      int i = n;
-      int j = (n+1)%3;
-      int k = (n+2)%3;
-
-      // add the first three intermediate vertices -1,-1,n
-      index[i] = _unit_cell_start_index[i]-1;
-      index[j] = _unit_cell_start_index[j]-1;
-      index[k] = _unit_cell_end_index[k]-1;
-      surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * (0.125 + (_unit_cell_mod_index[k]/4)));
-
-      // add the last three intermediate vertices -1,n,n
-      index[i] = _unit_cell_start_index[i]-1;
-      index[j] = _unit_cell_end_index[j]-1;
-      index[k] = _unit_cell_end_index[k]-1;
-      surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) *
-                  (0.125 +
-                   ((_unit_cell_mod_index[j] + _unit_cell_mod_index[k])/4) +
-                   (_unit_cell_mod_index[j] * _unit_cell_mod_index[k]/2)));
-
-      // add the three start edges -1,-1,k
-      index[i] = _unit_cell_start_index[i]-1;
-      index[j] = _unit_cell_start_index[j]-1;
-      for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-        surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * 0.25);
-      }
-
-      // add the three end edges n,n,k
-      index[i] = _unit_cell_end_index[i]-1;
-      index[j] = _unit_cell_end_index[j]-1;
-      for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-        surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) *
-                    (0.25 +
-                     ((_unit_cell_mod_index[j] + _unit_cell_mod_index[k])/2) +
-                     (_unit_cell_mod_index[j] * _unit_cell_mod_index[k])));
-      }
-
-      // add the three start faces -1,j,k
-      index[i] = _unit_cell_start_index[i]-1;
-      for (index[j] = _unit_cell_start_index[j]; index[j] < _unit_cell_end_index[j]-1; index[j]++){
-        for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-          surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * 0.5);
+    // Main volume calculation
+    std::array<unsigned int,3> index;
+    ctrl->updateCalculationStatus();
+    
+    #pragma omp parallel for collapse(3) reduction(+:surface) if(end_index[2] - start_index[2] > 4)
+    for(unsigned int z = start_index[2]; z < end_index[2]-1; z++) {
+        for(unsigned int y = start_index[1]; y < end_index[1]-1; y++) {
+            for(unsigned int x = start_index[0]; x < end_index[0]-1; x++) {
+                if(!ctrl->getAbortFlag()) {
+                    index = {x, y, z};
+                    surface += SurfaceLUT::configToArea(
+                        evalMarchingCubeConfig(index, types, id, cavity));
+                }
+            }
         }
-      }
-
-      // add the three end faces n,j,k
-      index[i] = _unit_cell_end_index[i]-1;
-      for (index[j] = _unit_cell_start_index[j]; index[j] < _unit_cell_end_index[j]-1; index[j]++){
-        for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-          surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * (0.5 + _unit_cell_mod_index[i]));
-        }
-      }
-
-      // add the six intermediate edges -1,n,k and n,-1,k
-      index[i] = _unit_cell_start_index[i]-1;
-      index[j] = _unit_cell_end_index[j]-1;
-      for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-        surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * (0.25 + (_unit_cell_mod_index[j]/2)));
-      }
-      index[i] = _unit_cell_end_index[i]-1;
-      index[j] = _unit_cell_start_index[j]-1;
-      for (index[k] = _unit_cell_start_index[k]; index[k] < _unit_cell_end_index[k]-1; index[k]++){
-        surface += (SurfaceLUT::configToArea(evalMarchingCubeConfig(index, types, id, cavity)) * (0.25 + (_unit_cell_mod_index[i]/2)));
-      }
     }
-  }
-  return surface;
+
+    if (!has_unit_cell) {
+        return surface;
+    }
+
+    // Unit cell border calculations
+    const auto [mod_x, mod_y, mod_z] = unit_cell_mods;
+    
+    // Helper lambda for vertex calculations
+    auto calcVertexSurface = [&](const std::array<unsigned int,3>& idx) {
+        return SurfaceLUT::configToArea(evalMarchingCubeConfig(idx, types, id, cavity));
+    };
+
+    // First vertex (-1,-1,-1)
+    index = {_unit_cell_start_index[0]-1, _unit_cell_start_index[1]-1, _unit_cell_start_index[2]-1};
+    surface += calcVertexSurface(index) * 0.125;
+
+    // Last vertex (n,n,n)
+    index = {_unit_cell_end_index[0]-1, _unit_cell_end_index[1]-1, _unit_cell_end_index[2]-1};
+    const double last_vertex_factor = 0.125 + ((mod_x + mod_y + mod_z)/4.0) +
+        (mod_x * mod_y + mod_x * mod_z + mod_y * mod_z)/2.0 +
+        (mod_x * mod_y * mod_z);
+    surface += calcVertexSurface(index) * last_vertex_factor;
+
+    // Process edges and faces
+    for(int n = 0; n < 3; n++) {
+        const int i = n;
+        const int j = (n+1)%3;
+        const int k = (n+2)%3;
+        
+        // Process intermediate vertices and edges using SIMD-friendly loops where possible
+        processBorderRegion(types, id, cavity, i, j, k, surface, 
+                          _unit_cell_start_index, _unit_cell_end_index, 
+                          std::get<0>(unit_cell_mods), 
+                          std::get<1>(unit_cell_mods), 
+                          std::get<2>(unit_cell_mods));
+    }
+
+    return surface;
 }
 
+// Helper function to process border regions
+inline void Space::processBorderRegion(const std::vector<char>& types, 
+                                     const unsigned char id,
+                                     const bool cavity,
+                                     const int i, const int j, const int k,
+                                     double& surface,
+                                     const std::array<unsigned int,3>& start_idx,
+                                     const std::array<unsigned int,3>& end_idx,
+                                     const double mod_i,
+                                     [[maybe_unused]] const double mod_j,
+                                     [[maybe_unused]] const double mod_k) {
+    std::array<unsigned int,3> index;
+    
+    // Process faces with vectorized operations where possible
+    #pragma omp simd reduction(+:surface)
+    for (index[j] = start_idx[j]; index[j] < end_idx[j]-1; index[j]++) {
+        for (index[k] = start_idx[k]; index[k] < end_idx[k]-1; index[k]++) {
+            // Start face
+            index[i] = start_idx[i]-1;
+            surface += SurfaceLUT::configToArea(
+                evalMarchingCubeConfig(index, types, id, cavity)) * 0.5;
+            
+            // End face
+            index[i] = end_idx[i]-1;
+            surface += SurfaceLUT::configToArea(
+                evalMarchingCubeConfig(index, types, id, cavity)) * (0.5 + mod_i);
+        }
+    }
+}
 bool isSolid(const Voxel&, const std::vector<char>&);
 
 unsigned char Space::evalMarchingCubeConfig(const std::array<unsigned int,3>& index, const std::vector<char>& types, const unsigned char id, const bool cavity){

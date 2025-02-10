@@ -79,7 +79,16 @@ class Space{
     void identifyCavities(std::vector<Cavity>&, const bool=false);
     void descendToCore(std::vector<Cavity>&, unsigned char&, const std::array<unsigned,3>, int, const bool);
     void assignShellVsVoid();
-
+    inline void processBorderRegion(const std::vector<char>& types, 
+                                  const unsigned char id,
+                                  const bool cavity,
+                                  const int i, const int j, const int k,
+                                  double& surface,
+                                  const std::array<unsigned int,3>& start_idx,
+                                  const std::array<unsigned int,3>& end_idx,
+                                  const double mod_i,
+                                  [[maybe_unused]] const double mod_j,
+                                  [[maybe_unused]] const double mod_k);
     double tallySurface(const std::vector<char>&, std::array<unsigned int,3>&, std::array<unsigned int,3>&, const unsigned char=0, const bool=false);
     unsigned char evalMarchingCubeConfig(const std::array<unsigned int,3>&, const std::vector<char>&, const unsigned char, const bool);
 
