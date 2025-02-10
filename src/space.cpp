@@ -472,9 +472,9 @@ inline void Space::processBorderRegion(const std::vector<char>& types,
     std::array<unsigned int,3> index;
     
     // Process faces with vectorized operations where possible
-    #pragma omp simd reduction(+:surface)
-    for (index[j] = start_idx[j]; index[j] < end_idx[j]-1; index[j]++) {
-        for (index[k] = start_idx[k]; index[k] < end_idx[k]-1; index[k]++) {
+	#pragma omp simd reduction(+:surface)
+	for (size_t j_idx = start_idx[j]; j_idx < end_idx[j] - 1; j_idx++) {
+	    for (size_t k_idx = start_idx[k]; k_idx < end_idx[k] - 1; k_idx++) {
             // Start face
             index[i] = start_idx[i]-1;
             surface += SurfaceLUT::configToArea(

@@ -25,6 +25,20 @@ include(ExecutableName)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+if(APPLE)
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp")
+        set(OpenMP_C_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY /opt/homebrew/opt/libomp/lib/libomp.dylib)
+    endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp")
+        set(OpenMP_CXX_LIB_NAMES "omp")
+        set(OpenMP_omp_LIBRARY /opt/homebrew/opt/libomp/lib/libomp.dylib)
+    endif()
+endif()
+
+
 # Make universal binary
 if(MOLOVOL_OSX_FAT_FILE)
   set(CMAKE_OSX_ARCHITECTURES arm64;x86_64)
@@ -72,7 +86,6 @@ endif()
 
 # Target MoloVol
 add_executable(${EXE_NAME} ${SOURCES} ${OSX_RESOURCE_FILES})
-
 # XCode, app bundle and libtiff
 include(MacSpecific)
 
@@ -92,6 +105,12 @@ elseif (APPLE)
 endif()
 
 include(Packing)
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(${EXE_NAME} PUBLIC OpenMP::OpenMP_CXX)
+    target_compile_definitions(${EXE_NAME} PUBLIC HAVE_OPENMP)
+endif()
 
 # Ensure molovol_test is built if MOLOVOL_BUILD_TESTING is ON
 if(MOLOVOL_BUILD_TESTING)
